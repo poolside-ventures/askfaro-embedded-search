@@ -8,8 +8,10 @@ queries with identical semantics.
 
 from __future__ import annotations
 
+from typing import Sequence
+
 from .backends.base import Backend
-from .backends.sqlite import SQLiteBackend
+from .backends.sqlite import DEFAULT_SPACE, SQLiteBackend
 
 
 async def replicate(
@@ -35,9 +37,18 @@ async def replicate(
 
 
 async def export_shard(
-    source: Backend, dest_path: str, *, partition: str | None = None
+    source: Backend,
+    dest_path: str,
+    *,
+    partition: str | None = None,
+    spaces: Sequence[str] = (DEFAULT_SPACE,),
 ) -> SQLiteBackend:
-    """Export a partition into a fresh SQLite shard file and return it open."""
-    dest = SQLiteBackend(dest_path)
+    """Export a partition into a fresh SQLite shard file and return it open.
+
+    `spaces` selects which embedding spaces the shard carries — typically just
+    the on-device space (e.g. ("local",)), so the device never ships the
+    larger server vectors. Spaces the dest doesn't declare are simply dropped.
+    """
+    dest = SQLiteBackend(dest_path, spaces=spaces)
     await replicate(source, dest, partition=partition)
     return dest

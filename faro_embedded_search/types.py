@@ -37,6 +37,11 @@ class IndexDoc:
     # Structured fields to filter on at query time (e.g. {"category": "finance",
     # "status": "active"}). Stored as JSON; matched by equality / containment.
     attrs: dict[str, Any] | None = None
+    # Which embedding spaces to populate for this object (e.g. ["server",
+    # "local"]). None = every space the index is configured with. Lets a type
+    # opt out of a space — e.g. emails embed server-side only, so on-device
+    # they're keyword-searchable but not semantically.
+    embed_spaces: list[str] | None = None
     source_updated_at: str = field(default_factory=utcnow_iso)
 
     @property

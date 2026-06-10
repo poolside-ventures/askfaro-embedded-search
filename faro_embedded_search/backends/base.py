@@ -14,7 +14,8 @@ Change rows — the sync contract between backends — are plain dicts:
         "title": str | None,
         "body": str | None,
         "payload": dict | None,
-        "embedding": list[float] | None,
+        "attrs": dict | None,
+        "embeddings": {space: list[float]},  # one entry per populated space
         "source_updated_at": str (ISO 8601),
         "embedding_indexed_at": str | None,
         "deleted_at": str | None,
@@ -37,10 +38,12 @@ ChangeRow = dict[str, Any]
 
 @runtime_checkable
 class Backend(Protocol):
+    spaces: Sequence[str]  # configured embedding-space names
+
     async def upsert_row(
         self,
         doc: IndexDoc,
-        embedding: list[float] | None,
+        embeddings: dict[str, list[float] | None],
         embedding_indexed_at: str | None,
     ) -> None: ...
 
@@ -57,6 +60,7 @@ class Backend(Protocol):
     async def semantic_search(
         self,
         query_vec: Sequence[float],
+        space: str,
         filters: Filters,
         limit: int,
         min_score: float,

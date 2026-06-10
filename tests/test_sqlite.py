@@ -1,7 +1,14 @@
 import pytest
 
-from faro_embedded_search import IndexDoc, SearchIndex, export_shard, replicate
+from faro_embedded_search import (
+    CallableEmbedder,
+    IndexDoc,
+    SearchIndex,
+    export_shard,
+    replicate,
+)
 from faro_embedded_search.backends.sqlite import SQLiteBackend
+from tests.conftest import bow_vector
 
 
 @pytest.fixture
@@ -65,7 +72,7 @@ async def test_delete_tombstones_and_strips_content(index):
     rows, _ = await index.changes_since(None)
     tombstone = next(r for r in rows if r["object_id"] == "n1")
     assert tombstone["deleted_at"] is not None
-    assert tombstone["title"] is None and tombstone["embedding"] is None
+    assert tombstone["title"] is None and not tombstone["embeddings"]
 
 
 async def test_filters(index):
@@ -88,6 +95,47 @@ async def test_summary_nodes_collapse_to_one_object(index):
     results = await index.search("hiring")
     assert len(results) == 1
     assert set(results[0].matched_node_kinds) == {"leaf", "summary"}
+
+
+async def test_multi_space_dual_model_and_device_shard(tmp_path):
+    # Two embedding spaces: a "server" model and an on-device "local" model.
+    emb = CallableEmbedder(lambda ts: [bow_vector(t) for t in ts])
+    backend = SQLiteBackend(spaces=("server", "local"))
+    idx = SearchIndex(
+        backend, embedders={"server": emb, "local": emb}, default_space="server"
+    )
+    await idx.upsert_many([
+        # Note opts into all spaces (default) -> server + local vectors.
+        IndexDoc(object_type="note", object_id="n1", title="Quantum notes",
+                 body="entanglement spooky action", partition="p1"),
+        # Email is server-only: no local vector will be produced.
+        IndexDoc(object_type="email", object_id="e1", title="Invoice",
+                 body="payment reminder client overdue", partition="p1",
+                 embed_spaces=["server"]),
+    ])
+    # On the server space, the email IS semantically searchable.
+    server = await idx.search("overdue payment", space="server")
+    assert any(r.object_id == "e1" and r.match_type in ("semantic", "hybrid")
+               for r in server)
+
+    # Device shard carries ONLY the local space (smaller; no server vectors).
+    shard = SearchIndex(
+        await export_shard(backend, str(tmp_path / "device.db"),
+                           partition="p1", spaces=("local",)),
+        embedders={"local": emb}, default_space="local",
+    )
+    await idx.close()
+    # Note has a local vector -> full semantic search offline.
+    assert any(r.object_id == "n1"
+               for r in await shard.search("quantum entanglement", space="local"))
+    # Email has NO local vector -> never a semantic/hybrid hit on device...
+    for r in await shard.search("overdue payment", space="local"):
+        if r.object_id == "e1":
+            assert r.match_type == "keyword"
+    # ...but its text synced, so keyword search still finds it offline.
+    assert any(r.object_id == "e1"
+               for r in await shard.search("invoice", space="local"))
+    await shard.close()
 
 
 async def test_lexical_only_when_no_embedder():

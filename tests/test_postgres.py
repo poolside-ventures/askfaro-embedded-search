@@ -33,6 +33,45 @@ async def index(embedder):
     await idx.close()
 
 
+async def test_postgres_multi_space(embedder):
+    from sqlalchemy import text
+
+    from faro_embedded_search import IndexDoc, SearchIndex
+    from faro_embedded_search.backends.postgres import PostgresBackend
+
+    backend = PostgresBackend(DSN, table="fs_multi", spaces={"server": DIM, "local": DIM})
+    async with backend._engine.begin() as conn:
+        await conn.execute(text("DROP TABLE IF EXISTS fs_multi"))
+        await conn.execute(text("DROP SEQUENCE IF EXISTS fs_multi_updated_seq"))
+    await backend.create_schema()
+    idx = SearchIndex(
+        backend, embedders={"server": embedder, "local": embedder},
+        default_space="server",
+    )
+    await idx.upsert_many([
+        IndexDoc(object_type="note", object_id="n1", title="Quantum notes",
+                 body="entanglement spooky action", partition="p1"),
+        IndexDoc(object_type="email", object_id="e1", title="Invoice",
+                 body="payment reminder overdue", partition="p1",
+                 embed_spaces=["server"]),
+    ])
+    # Server space: email embedded -> semantic hit.
+    assert any(r.object_id == "e1" and r.match_type in ("semantic", "hybrid")
+               for r in await idx.search("overdue payment", space="server"))
+    # Local space: note embedded -> semantic hit; email has no local vector,
+    # so it can only surface lexically.
+    assert any(r.object_id == "n1"
+               for r in await idx.search("quantum entanglement", space="local"))
+    for r in await idx.search("overdue payment", space="local"):
+        if r.object_id == "e1":
+            assert r.match_type == "keyword"
+
+    async with backend._engine.begin() as conn:
+        await conn.execute(text("DROP TABLE IF EXISTS fs_multi"))
+        await conn.execute(text("DROP SEQUENCE IF EXISTS fs_multi_updated_seq"))
+    await idx.close()
+
+
 async def test_postgres_end_to_end(index, embedder, tmp_path):
     await index.upsert_many([
         IndexDoc(object_type="note", object_id="n1",

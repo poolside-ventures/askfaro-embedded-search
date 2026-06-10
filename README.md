@@ -102,6 +102,38 @@ await index.upsert_many([
 ])
 ```
 
+## Multiple embedding spaces (dual-model / on-device)
+
+A row can carry vectors from more than one model — typically a high-quality **server** model and a smaller **on-device** model — each as its own independently-queried space. Vectors from different models are never compared, so there's no mismatch.
+
+```python
+index = SearchIndex(
+    backend,                                    # configured with both spaces
+    embedders={"server": openai, "local": on_device_minilm},
+    default_space="server",
+)
+
+# A note participates in both spaces (default); an email is server-only:
+await index.upsert_many([
+    IndexDoc(object_type="note",  object_id="n1", title="...", body="..."),
+    IndexDoc(object_type="email", object_id="e1", title="...", body="...",
+             embed_spaces=["server"]),         # no on-device vector
+])
+
+# On the server, query the server space; on-device, query the local space:
+await index.search("quarterly plan", space="server")   # web/server
+await index.search("quarterly plan", space="local")    # device shard
+```
+
+The device shard carries only the on-device space (smaller — no server vectors):
+
+```python
+shard = await export_shard(server_backend, "user-42.db",
+                           partition="user-42", spaces=("local",))
+```
+
+Because a server-only object (the email above) has no local vector, on-device it's **keyword-searchable but not semantic** — its text still syncs, so FTS finds it offline; semantic search on it requires querying the server. This falls out of the per-space null-vector handling, no special-casing. Configure backends with matching spaces: `PostgresBackend(..., spaces={"server": 1536, "local": 384})`, `SQLiteBackend(..., spaces=("local",))`.
+
 ## Heterogeneous objects
 
 Per-type behavior lives in code, not schema, via a tiny registry:
