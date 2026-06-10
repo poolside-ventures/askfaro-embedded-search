@@ -38,12 +38,22 @@ async def test_postgres_end_to_end(index, embedder, tmp_path):
         IndexDoc(object_type="note", object_id="n1",
                  title="Quantum entanglement notes",
                  body="spooky action at a distance", partition="acct-1",
-                 payload={"icon": "atom"}),
+                 payload={"icon": "atom"}, attrs={"folder": "physics"}),
         IndexDoc(object_type="task", object_id="t1", title="Fix login bug",
                  body="users report oauth redirect loop", partition="acct-1"),
         IndexDoc(object_type="note", object_id="n2", title="Grocery list",
-                 body="milk eggs bread", partition="acct-2"),
+                 body="milk eggs bread", partition="acct-2",
+                 attrs={"folder": "home"}),
     ])
+
+    # Stemming parity: 'groceries' matches 'Grocery' via the english stemmer,
+    # the same way SQLite porter stems it.
+    assert (await index.search("groceries"))[0].object_id == "n2"
+
+    # attrs filter (JSONB containment).
+    folder_hits = await index.search("grocery quantum", attrs={"folder": "physics"})
+    assert [r.object_id for r in folder_hits] == ["n1"]
+    assert not await index.search("grocery quantum", attrs={"folder": "nope"})
 
     # Hybrid: lexical + semantic agree.
     results = await index.search("grocery milk")

@@ -73,6 +73,7 @@ class SearchIndex:
         partition: str | None = None,
         object_types: list[str] | None = None,
         node_kinds: list[str] | None = None,
+        attrs: dict | None = None,
         min_semantic_score: float = DEFAULT_MIN_SEMANTIC_SCORE,
         collapse: bool = True,
         diversity_key: Callable[[SearchResult], str] | None = None,
@@ -82,7 +83,10 @@ class SearchIndex:
         if not query:
             return []
         filters = Filters(
-            partition=partition, object_types=object_types, node_kinds=node_kinds
+            partition=partition,
+            object_types=object_types,
+            node_kinds=node_kinds,
+            attrs=attrs,
         )
         # Pull more candidates per retriever than we return — RRF benefits
         # from seeing each retriever's fuller ranked list.

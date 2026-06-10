@@ -68,6 +68,7 @@ class PostgresBackend:
             title TEXT,
             body TEXT,
             payload JSONB,
+            attrs JSONB,
             embedding vector({self.dim}),
             search_vector tsvector GENERATED ALWAYS AS (
                 setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
@@ -79,10 +80,14 @@ class PostgresBackend:
             updated_seq BIGINT NOT NULL,
             UNIQUE (object_type, object_id, node_kind)
         );
+        -- In-place upgrade for tables created by an older version.
+        ALTER TABLE {self.table} ADD COLUMN IF NOT EXISTS attrs JSONB;
         CREATE INDEX IF NOT EXISTS ix_{self.table}_hnsw ON {self.table}
             USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
         CREATE INDEX IF NOT EXISTS ix_{self.table}_fts ON {self.table}
             USING gin (search_vector);
+        CREATE INDEX IF NOT EXISTS ix_{self.table}_attrs ON {self.table}
+            USING gin (attrs);
         CREATE INDEX IF NOT EXISTS ix_{self.table}_partition ON {self.table}
             (partition_key, object_type) WHERE deleted_at IS NULL;
         CREATE INDEX IF NOT EXISTS ix_{self.table}_seq ON {self.table} (updated_seq);
@@ -108,11 +113,12 @@ class PostgresBackend:
                     f"""
                     INSERT INTO {self.table} (
                         partition_key, object_type, object_id, node_kind, title,
-                        body, payload, embedding, source_updated_at,
+                        body, payload, attrs, embedding, source_updated_at,
                         embedding_indexed_at, deleted_at, updated_seq
                     ) VALUES (
                         :partition, :object_type, :object_id, :node_kind, :title,
-                        :body, CAST(:payload AS jsonb), CAST(:vec AS vector),
+                        :body, CAST(:payload AS jsonb), CAST(:attrs AS jsonb),
+                        CAST(:vec AS vector),
                         :source_updated_at, :embedding_indexed_at,
                         NULL, nextval('{self.seq}')
                     )
@@ -121,6 +127,7 @@ class PostgresBackend:
                         title = excluded.title,
                         body = excluded.body,
                         payload = excluded.payload,
+                        attrs = excluded.attrs,
                         embedding = excluded.embedding,
                         source_updated_at = excluded.source_updated_at,
                         embedding_indexed_at = excluded.embedding_indexed_at,
@@ -136,6 +143,7 @@ class PostgresBackend:
                     "title": doc.title,
                     "body": doc.body,
                     "payload": json.dumps(doc.payload) if doc.payload is not None else None,
+                    "attrs": json.dumps(doc.attrs) if doc.attrs is not None else None,
                     "vec": _vector_literal(embedding) if embedding else None,
                     "source_updated_at": _ts(doc.source_updated_at),
                     "embedding_indexed_at": _ts(embedding_indexed_at),
@@ -174,6 +182,9 @@ class PostgresBackend:
         if filters.node_kinds:
             clauses.append("node_kind = ANY(:f_kinds)")
             params["f_kinds"] = filters.node_kinds
+        if filters.attrs:
+            clauses.append("attrs @> CAST(:f_attrs AS jsonb)")
+            params["f_attrs"] = json.dumps(filters.attrs)
         return (" AND " + " AND ".join(clauses)) if clauses else ""
 
     @staticmethod
@@ -264,7 +275,7 @@ class PostgresBackend:
                 text(
                     f"""
                     SELECT partition_key, object_type, object_id, node_kind, title,
-                           body, payload, CAST(embedding AS text) AS embedding,
+                           body, payload, attrs, CAST(embedding AS text) AS embedding,
                            source_updated_at, embedding_indexed_at, deleted_at, updated_seq
                     FROM {self.table}
                     WHERE updated_seq > :cursor{where}
@@ -280,6 +291,9 @@ class PostgresBackend:
             payload = r["payload"]
             if isinstance(payload, str):
                 payload = json.loads(payload)
+            attrs = r["attrs"]
+            if isinstance(attrs, str):
+                attrs = json.loads(attrs)
             changes.append(
                 {
                     "object_type": r["object_type"],
@@ -289,6 +303,7 @@ class PostgresBackend:
                     "title": r["title"],
                     "body": r["body"],
                     "payload": payload,
+                    "attrs": attrs,
                     "embedding": _parse_vector(r["embedding"]),
                     "source_updated_at": _iso(r["source_updated_at"]),
                     "embedding_indexed_at": _iso(r["embedding_indexed_at"]),
@@ -311,11 +326,12 @@ class PostgresBackend:
                         f"""
                         INSERT INTO {self.table} (
                             partition_key, object_type, object_id, node_kind, title,
-                            body, payload, embedding, source_updated_at,
+                            body, payload, attrs, embedding, source_updated_at,
                             embedding_indexed_at, deleted_at, updated_seq
                         ) VALUES (
                             :partition, :object_type, :object_id, :node_kind, :title,
-                            :body, CAST(:payload AS jsonb), CAST(:vec AS vector),
+                            :body, CAST(:payload AS jsonb), CAST(:attrs AS jsonb),
+                            CAST(:vec AS vector),
                             :source_updated_at, :embedding_indexed_at,
                             :deleted_at, :updated_seq
                         )
@@ -324,6 +340,7 @@ class PostgresBackend:
                             title = excluded.title,
                             body = excluded.body,
                             payload = excluded.payload,
+                            attrs = excluded.attrs,
                             embedding = excluded.embedding,
                             source_updated_at = excluded.source_updated_at,
                             embedding_indexed_at = excluded.embedding_indexed_at,
@@ -340,6 +357,9 @@ class PostgresBackend:
                         "body": row.get("body"),
                         "payload": json.dumps(row["payload"])
                         if row.get("payload") is not None
+                        else None,
+                        "attrs": json.dumps(row["attrs"])
+                        if row.get("attrs") is not None
                         else None,
                         "vec": _vector_literal(row["embedding"])
                         if row.get("embedding")

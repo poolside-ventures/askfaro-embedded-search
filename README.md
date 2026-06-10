@@ -43,6 +43,23 @@ Deleting and updating are first-class — deletes are tombstones so they propaga
 await index.delete("note", "n1")
 ```
 
+### Filtering
+
+Filter by partition (the isolation/shard key), object type, node kind, or arbitrary structured attributes:
+
+```python
+await index.upsert(IndexDoc(
+    object_type="tool", object_id="stripe/refund",
+    title="Refund a charge", body="...",
+    attrs={"category": "finance", "status": "active"},   # structured filter fields
+))
+
+# Only finance tools:
+await index.search("refund a customer", object_types=["tool"], attrs={"category": "finance"})
+```
+
+`attrs` is matched by containment (all given keys must equal), backed by a JSONB GIN index on Postgres and `json_extract` on SQLite — so it filters identically on server and device.
+
 ### Server-side: Postgres
 
 ```python
@@ -108,7 +125,13 @@ await index.upsert_many(docs_for("contact", some_contact))
 - **Embedding failure is non-fatal.** A row written without a vector still serves lexical queries and gains semantic retrieval after a backfill — availability over completeness.
 - **Exact semantic scan on SQLite.** Per-user shards are small (tens of thousands of rows); an exact cosine scan (numpy-accelerated when present) costs no index maintenance and returns exact results. ANN acceleration (e.g. sqlite-vec) can be added without changing the file format.
 - **Diversity, not padding.** An optional per-group cap (`diversity_key`) drops near-duplicate siblings instead of deferring them.
+- **Stemming parity.** Postgres uses the `english` text-search config; SQLite FTS5 uses the `porter` tokenizer. Both stem morphological variants ("groceries" → "grocery") so the server and a device shard rank the same corpus identically.
 - **No framework.** Plain SQL on both backends, zero required dependencies in the core.
+
+## Requirements
+
+- **Python 3.11+.** The core (SQLite backend) needs only the standard library — SQLite's FTS5 and JSON1 extensions ship with CPython's bundled SQLite.
+- **Postgres backend** (`[postgres]` extra) needs a database with the **pgvector** extension available. `create_schema()` runs `CREATE EXTENSION IF NOT EXISTS vector` and the rest of the DDL in one idempotent call (or transcribe it into your own migrations). It is safe to re-run; it also adds new columns in place when you upgrade the library.
 
 ## Installation
 

@@ -4,6 +4,28 @@ All notable changes to `faro-embedded-search` are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/), and the project aims
 to follow [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-06-10
+
+### Fixed
+- **Cross-backend stemming parity.** SQLite FTS5 now uses the `porter`
+  tokenizer, so morphological variants match the same way Postgres
+  `to_tsvector('english')` stems them (e.g. "groceries" matches "grocery").
+  Previously the SQLite (device) backend did not stem, so it could rank the
+  same corpus differently from the Postgres (server) backend — a violation of
+  the library's identical-semantics guarantee.
+
+### Added
+- **Generic attribute filter.** `IndexDoc.attrs` (a JSON dict) plus an
+  `attrs=` argument to `SearchIndex.search` filters results by equality /
+  containment (e.g. `attrs={"category": "finance"}`). Backed by a JSONB GIN
+  index on Postgres and `json_extract` on SQLite. Removes the need to overload
+  `partition` for non-isolation filters.
+- `py.typed` marker so downstream type checkers see the library's annotations.
+- Idempotent in-place schema upgrades: `create_schema()` (Postgres) and
+  `SQLiteBackend(...)` add the new `attrs` column to indexes created by 0.1.0.
+
+[0.2.0]: https://github.com/poolside-ventures/faro-embedded-search/releases/tag/v0.2.0
+
 ## [0.1.0] - 2026-06-10
 
 Initial release.

@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS search_index (
     title TEXT,
     body TEXT,
     payload TEXT,
+    attrs TEXT,
     embedding BLOB,
     embedding_dim INTEGER,
     source_updated_at TEXT NOT NULL,
@@ -51,8 +52,13 @@ CREATE INDEX IF NOT EXISTS ix_si_partition
     ON search_index (partition_key, object_type) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS ix_si_seq ON search_index (updated_seq);
 CREATE TABLE IF NOT EXISTS search_meta (key TEXT PRIMARY KEY, value TEXT);
+-- `porter` stemming so morphological variants match the way Postgres'
+-- to_tsvector('english') stems them ("groceries" -> "grocery"). Without it,
+-- SQLite (device) and Postgres (server) would rank the same corpus
+-- differently, breaking the library's identical-semantics guarantee.
 CREATE VIRTUAL TABLE IF NOT EXISTS search_fts
-    USING fts5(title, body, content='search_index', content_rowid='id');
+    USING fts5(title, body, content='search_index', content_rowid='id',
+               tokenize='porter unicode61');
 CREATE TRIGGER IF NOT EXISTS search_index_ai AFTER INSERT ON search_index BEGIN
     INSERT INTO search_fts(rowid, title, body) VALUES (new.id, new.title, new.body);
 END;
@@ -94,7 +100,15 @@ class SQLiteBackend:
         if path != ":memory:":
             self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.executescript(_SCHEMA)
+        self._migrate()
         self._conn.commit()
+
+    def _migrate(self) -> None:
+        """In-place upgrades for indexes created by an older version, so
+        `SQLiteBackend(existing.db)` just works after a library upgrade."""
+        cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(search_index)")}
+        if "attrs" not in cols:
+            self._conn.execute("ALTER TABLE search_index ADD COLUMN attrs TEXT")
 
     # -- write path -------------------------------------------------------
 
@@ -128,14 +142,15 @@ class SQLiteBackend:
             """
             INSERT INTO search_index (
                 partition_key, object_type, object_id, node_kind, title, body,
-                payload, embedding, embedding_dim, source_updated_at,
+                payload, attrs, embedding, embedding_dim, source_updated_at,
                 embedding_indexed_at, deleted_at, updated_seq
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (object_type, object_id, node_kind) DO UPDATE SET
                 partition_key = excluded.partition_key,
                 title = excluded.title,
                 body = excluded.body,
                 payload = excluded.payload,
+                attrs = excluded.attrs,
                 embedding = excluded.embedding,
                 embedding_dim = excluded.embedding_dim,
                 source_updated_at = excluded.source_updated_at,
@@ -151,6 +166,7 @@ class SQLiteBackend:
                 row.get("title"),
                 row.get("body"),
                 json.dumps(row["payload"]) if row.get("payload") is not None else None,
+                json.dumps(row["attrs"]) if row.get("attrs") is not None else None,
                 _pack(embedding) if embedding else None,
                 len(embedding) if embedding else None,
                 row["source_updated_at"],
@@ -175,6 +191,7 @@ class SQLiteBackend:
                 "title": doc.title,
                 "body": doc.body,
                 "payload": doc.payload,
+                "attrs": doc.attrs,
                 "embedding": embedding,
                 "source_updated_at": doc.source_updated_at,
                 "embedding_indexed_at": embedding_indexed_at,
@@ -219,6 +236,10 @@ class SQLiteBackend:
                 f"si.node_kind IN ({','.join('?' * len(filters.node_kinds))})"
             )
             params.extend(filters.node_kinds)
+        if filters.attrs:
+            for key, value in filters.attrs.items():
+                clauses.append(f"json_extract(si.attrs, '$.{key}') = ?")
+                params.append(value)
         return (" AND " + " AND ".join(clauses)) if clauses else "", params
 
     @staticmethod
@@ -300,6 +321,7 @@ class SQLiteBackend:
                     "title": r["title"],
                     "body": r["body"],
                     "payload": json.loads(r["payload"]) if r["payload"] else None,
+                    "attrs": json.loads(r["attrs"]) if r["attrs"] else None,
                     "embedding": list(_unpack(r["embedding"])) if r["embedding"] else None,
                     "source_updated_at": r["source_updated_at"],
                     "embedding_indexed_at": r["embedding_indexed_at"],

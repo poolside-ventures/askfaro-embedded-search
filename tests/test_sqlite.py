@@ -98,6 +98,43 @@ async def test_lexical_only_when_no_embedder():
     await idx.close()
 
 
+async def test_porter_stemming_matches_morphological_variants(index):
+    # 'groceries' (query) must match 'grocery' (indexed) via FTS5 porter
+    # stemming — the same way Postgres to_tsvector('english') stems them.
+    # This is the cross-backend parity guarantee: server and device rank the
+    # same corpus identically.
+    await index.upsert(doc("n1", "Grocery list", "things to buy"))
+    results = await index.search("groceries")
+    assert [r.object_id for r in results] == ["n1"]
+
+
+async def test_attrs_filter(index):
+    await index.upsert_many([
+        IndexDoc(object_type="tool", object_id="t1", title="Stripe payments",
+                 body="charge customer cards", attrs={"category": "finance"}),
+        IndexDoc(object_type="tool", object_id="t2", title="Twilio messaging",
+                 body="charge ahead and send a text", attrs={"category": "comms"}),
+    ])
+    fin = await index.search("charge", attrs={"category": "finance"})
+    assert [r.object_id for r in fin] == ["t1"]
+    comms = await index.search("charge", attrs={"category": "comms"})
+    assert [r.object_id for r in comms] == ["t2"]
+    # Multi-key containment: both keys must match.
+    none = await index.search("charge", attrs={"category": "finance", "tier": "pro"})
+    assert none == []
+
+
+async def test_attrs_round_trip_through_shard(index, embedder, tmp_path):
+    await index.upsert(IndexDoc(object_type="tool", object_id="t1", title="Stripe",
+                                body="payments", partition="p1",
+                                attrs={"category": "finance"}))
+    shard = SearchIndex(await export_shard(index.backend, str(tmp_path / "s.db"),
+                                           partition="p1"), embedder)
+    hit = (await shard.search("payments", attrs={"category": "finance"}))[0]
+    assert hit.object_id == "t1"
+    await shard.close()
+
+
 async def test_shard_export_and_delta_sync(index, embedder, tmp_path):
     await seed(index)
     shard_path = str(tmp_path / "shard.db")

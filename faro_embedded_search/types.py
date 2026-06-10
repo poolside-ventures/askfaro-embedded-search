@@ -34,6 +34,9 @@ class IndexDoc:
     node_kind: str = NODE_KIND_LEAF
     partition: str | None = None
     payload: dict[str, Any] | None = None
+    # Structured fields to filter on at query time (e.g. {"category": "finance",
+    # "status": "active"}). Stored as JSON; matched by equality / containment.
+    attrs: dict[str, Any] | None = None
     source_updated_at: str = field(default_factory=utcnow_iso)
 
     @property
@@ -85,3 +88,4 @@ class Filters:
     partition: str | None = None
     object_types: list[str] | None = None
     node_kinds: list[str] | None = None
+    attrs: dict[str, Any] | None = None  # equality match on stored IndexDoc.attrs
