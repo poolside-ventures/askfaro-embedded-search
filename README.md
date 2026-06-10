@@ -1,8 +1,8 @@
-# faro-search
+# faro-embedded-search
 
 **Incremental hybrid retrieval with identical semantics on the server and on-device.**
 
-`faro-search` is a small, dependency-light library for searching a *continuously growing* collection of heterogeneous objects — notes, contacts, emails, tasks, tools, anything — without ever rebuilding an index. It is built for the pattern modern assistant apps need:
+`faro-embedded-search` is a small, dependency-light library for searching a *continuously growing* collection of heterogeneous objects — notes, contacts, emails, tasks, tools, anything — without ever rebuilding an index. It is built for the pattern modern assistant apps need:
 
 > **Index server-side, retrieve on-device.** Embeddings are computed once, centrally. Each user's slice of the index is replicated into a local SQLite shard, and the device answers queries locally — fast, offline, and private — with *exactly* the same ranking the server would produce.
 
@@ -10,7 +10,7 @@ Built and dogfooded by [Faro](https://faro.dev); also the embedded retrieval eng
 
 ## Why another retrieval library?
 
-Most RAG tooling assumes a batch world: ingest a corpus, build a tree/graph/index, query it. Real applications have **object-level CRUD** — a contact edited, a task created, an email deleted — and small/on-device context windows that punish irrelevant results. `faro-search` makes two opinionated choices:
+Most RAG tooling assumes a batch world: ingest a corpus, build a tree/graph/index, query it. Real applications have **object-level CRUD** — a contact edited, a task created, an email deleted — and small/on-device context windows that punish irrelevant results. `faro-embedded-search` makes two opinionated choices:
 
 1. **Incremental-first.** One upsert per object write. Postgres (pgvector HNSW + tsvector GIN) and SQLite (FTS5 + vector blobs) both take per-row inserts natively, so there is no "rebuild" anywhere in the design. Hierarchical enrichment (summary and cluster nodes) lives in the *same flat pool* as extra rows — never on the write path.
 2. **Rank-based fusion.** Lexical and semantic retrievers run in parallel and are fused with Reciprocal Rank Fusion (RRF, K=60). Because RRF consumes *ranks*, not raw scores, the incomparable scoring scales of `ts_rank_cd` (Postgres) and `bm25()` (SQLite FTS5) don't matter: the same corpus and query rank identically on both backends. That is what makes "same engine, server and device" honest rather than aspirational.
@@ -18,8 +18,8 @@ Most RAG tooling assumes a batch world: ingest a corpus, build a tree/graph/inde
 ## Quick start
 
 ```python
-from faro_search import IndexDoc, SearchIndex, OpenAICompatibleEmbedder
-from faro_search.backends.sqlite import SQLiteBackend
+from faro_embedded_search import IndexDoc, SearchIndex, OpenAICompatibleEmbedder
+from faro_embedded_search.backends.sqlite import SQLiteBackend
 
 index = SearchIndex(
     SQLiteBackend("search.db"),
@@ -46,9 +46,9 @@ await index.delete("note", "n1")
 ### Server-side: Postgres
 
 ```python
-from faro_search.backends.postgres import PostgresBackend  # pip install faro-search[postgres]
+from faro_embedded_search.backends.postgres import PostgresBackend  # pip install faro-embedded-search[postgres]
 
-backend = PostgresBackend("postgresql+asyncpg://...", table="faro_search_index", dim=1536)
+backend = PostgresBackend("postgresql+asyncpg://...", table="faro_embedded_search_index", dim=1536)
 await backend.create_schema()     # idempotent; or transcribe the DDL into your migrations
 index = SearchIndex(backend, embedder)
 ```
@@ -56,7 +56,7 @@ index = SearchIndex(backend, embedder)
 ### On-device: replicate a shard, query locally
 
 ```python
-from faro_search import export_shard, replicate
+from faro_embedded_search import export_shard, replicate
 
 # Full export of one user's partition into a SQLite file:
 shard = await export_shard(server_backend, "user-42.db", partition="user-42")
@@ -69,7 +69,7 @@ The shard is a plain SQLite file whose schema **is** the interchange format — 
 
 ## Tiering without batch trees
 
-RAPTOR-style hierarchies buy small-context windows a lot — but a recursive tree can't be rebuilt on every insert. `faro-search` keeps the index flat and gets the benefit through **node kinds**:
+RAPTOR-style hierarchies buy small-context windows a lot — but a recursive tree can't be rebuilt on every insert. `faro-embedded-search` keeps the index flat and gets the benefit through **node kinds**:
 
 - `leaf` — the object itself (default).
 - `summary` — an optional one-line abstract of an object, indexed alongside it. O(1) per object, generated on your write path or a background pass.
@@ -90,7 +90,7 @@ await index.upsert_many([
 Per-type behavior lives in code, not schema, via a tiny registry:
 
 ```python
-from faro_search import register, docs_for
+from faro_embedded_search import register, docs_for
 
 @register("contact")
 def index_contact(c) -> IndexDoc:
@@ -113,10 +113,10 @@ await index.upsert_many(docs_for("contact", some_contact))
 ## Installation
 
 ```bash
-pip install faro-search                # core (SQLite backend, stdlib only)
-pip install faro-search[postgres]      # + Postgres/pgvector backend
-pip install faro-search[http]          # + OpenAI-compatible embedder
-pip install faro-search[numpy]         # + fast cosine on SQLite
+pip install faro-embedded-search                # core (SQLite backend, stdlib only)
+pip install faro-embedded-search[postgres]      # + Postgres/pgvector backend
+pip install faro-embedded-search[http]          # + OpenAI-compatible embedder
+pip install faro-embedded-search[numpy]         # + fast cosine on SQLite
 ```
 
 ## License

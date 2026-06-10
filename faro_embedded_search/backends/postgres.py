@@ -39,7 +39,7 @@ def _parse_vector(value: Any) -> list[float] | None:
 
 
 class PostgresBackend:
-    def __init__(self, dsn_or_engine, *, table: str = "faro_search_index", dim: int = 1536):
+    def __init__(self, dsn_or_engine, *, table: str = "faro_embedded_search_index", dim: int = 1536):
         from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
         if isinstance(dsn_or_engine, AsyncEngine):

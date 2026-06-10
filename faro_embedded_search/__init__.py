@@ -1,4 +1,4 @@
-"""faro-search: incremental hybrid retrieval, server-side and on-device."""
+"""faro-embedded-search: incremental hybrid retrieval, server-side and on-device."""
 
 from .embedder import CallableEmbedder, Embedder, OpenAICompatibleEmbedder
 from .fusion import RRF_K, rrf_fuse

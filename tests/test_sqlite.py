@@ -1,7 +1,7 @@
 import pytest
 
-from faro_search import IndexDoc, SearchIndex, export_shard, replicate
-from faro_search.backends.sqlite import SQLiteBackend
+from faro_embedded_search import IndexDoc, SearchIndex, export_shard, replicate
+from faro_embedded_search.backends.sqlite import SQLiteBackend
 
 
 @pytest.fixture

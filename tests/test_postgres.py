@@ -1,6 +1,6 @@
-"""Postgres backend tests — run only when FARO_SEARCH_TEST_DSN is set, e.g.
+"""Postgres backend tests — run only when FARO_EMBEDDED_SEARCH_TEST_DSN is set, e.g.
 
-    FARO_SEARCH_TEST_DSN=postgresql+asyncpg://postgres:postgres@localhost:5434/faro_search_test
+    FARO_EMBEDDED_SEARCH_TEST_DSN=postgresql+asyncpg://postgres:postgres@localhost:5434/faro_embedded_search_test
 
 The database must have the pgvector extension available.
 """
@@ -9,10 +9,10 @@ import os
 
 import pytest
 
-from faro_search import IndexDoc, SearchIndex, export_shard
+from faro_embedded_search import IndexDoc, SearchIndex, export_shard
 
-DSN = os.environ.get("FARO_SEARCH_TEST_DSN")
-pytestmark = pytest.mark.skipif(not DSN, reason="FARO_SEARCH_TEST_DSN not set")
+DSN = os.environ.get("FARO_EMBEDDED_SEARCH_TEST_DSN")
+pytestmark = pytest.mark.skipif(not DSN, reason="FARO_EMBEDDED_SEARCH_TEST_DSN not set")
 
 from tests.conftest import DIM  # noqa: E402
 
@@ -21,7 +21,7 @@ from tests.conftest import DIM  # noqa: E402
 async def index(embedder):
     from sqlalchemy import text
 
-    from faro_search.backends.postgres import PostgresBackend
+    from faro_embedded_search.backends.postgres import PostgresBackend
 
     backend = PostgresBackend(DSN, table="fs_test_index", dim=DIM)
     await backend.create_schema()

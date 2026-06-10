@@ -1,5 +1,5 @@
-from faro_search.fusion import RRF_K, collapse_objects, diversify, rrf_fuse
-from faro_search.types import RawHit
+from faro_embedded_search.fusion import RRF_K, collapse_objects, diversify, rrf_fuse
+from faro_embedded_search.types import RawHit
 
 
 def hit(oid: str, kind: str = "leaf", sim: float | None = None) -> RawHit:
