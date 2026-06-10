@@ -6,7 +6,7 @@
 
 > **Index server-side, retrieve on-device.** Embeddings are computed once, centrally. Each user's slice of the index is replicated into a local SQLite shard, and the device answers queries locally — fast, offline, and private — with *exactly* the same ranking the server would produce.
 
-Built and dogfooded by [Faro](https://faro.dev); also the embedded retrieval engine of Scope.
+Built and dogfooded by Faro; also the embedded retrieval engine of Scope.
 
 ## Why another retrieval library?
 
