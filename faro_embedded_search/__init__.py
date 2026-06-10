@@ -1,6 +1,7 @@
 """faro-embedded-search: incremental hybrid retrieval, server-side and on-device."""
 
 from .embedder import CallableEmbedder, Embedder, OpenAICompatibleEmbedder
+from .errors import ConfigurationError, FaroSearchError, MissingDependencyError
 from .fusion import RRF_K, rrf_fuse
 from .index import DEFAULT_MIN_SEMANTIC_SCORE, SearchIndex
 from .registry import docs_for, register, registered_types
@@ -15,13 +16,16 @@ from .types import (
     SearchResult,
 )
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
     "CallableEmbedder",
+    "ConfigurationError",
     "DEFAULT_MIN_SEMANTIC_SCORE",
     "Embedder",
+    "FaroSearchError",
     "Filters",
+    "MissingDependencyError",
     "IndexDoc",
     "NODE_KIND_CLUSTER",
     "NODE_KIND_LEAF",

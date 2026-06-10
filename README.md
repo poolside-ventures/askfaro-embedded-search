@@ -165,6 +165,22 @@ await index.upsert_many(docs_for("contact", some_contact))
 - **Python 3.11+.** The core (SQLite backend) needs only the standard library — SQLite's FTS5 and JSON1 extensions ship with CPython's bundled SQLite.
 - **Postgres backend** (`[postgres]` extra) needs a database with the **pgvector** extension available. `create_schema()` runs `CREATE EXTENSION IF NOT EXISTS vector` and the rest of the DDL in one idempotent call (or transcribe it into your own migrations). It is safe to re-run; it also adds new columns in place when you upgrade the library.
 
+## Troubleshooting
+
+The library raises clear, actionable errors for the common setup mistakes (all subclasses of `FaroSearchError`):
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `MissingDependencyError: PostgresBackend requires the 'postgres' extra` | Installed the core only | `pip install "faro-embedded-search[postgres]"` |
+| `MissingDependencyError: OpenAICompatibleEmbedder requires the 'http' extra` | Missing httpx | `pip install "faro-embedded-search[http]"` |
+| `ConfigurationError: pgvector extension isn't available…` | Postgres server has no `vector` extension | Enable/install [pgvector](https://github.com/pgvector/pgvector), or use `SQLiteBackend` (no extension needed) |
+| `ConfigurationError: Embedding for space 'x' has dimension N, but the index is configured for M` | Embedder output dim ≠ the space's column dim | Match the dims: configure the backend with `spaces={'x': N}` (then re-create the schema), or use an embedder that emits M-dim vectors |
+| `ConfigurationError: …embedders for space(s) [...] that the backend doesn't define` | `SearchIndex` has an embedder for a space the backend wasn't configured with | Give the backend matching spaces: `PostgresBackend(..., spaces={...})` / `SQLiteBackend(..., spaces=(...))` |
+| `ConfigurationError: This SQLite build lacks the FTS5 extension` | Rare CPython build without FTS5 | Use a Python whose bundled SQLite has FTS5 |
+| Postgres error: relation `…_index` does not exist | Forgot to set up the schema | Call `await backend.create_schema()` once (or run the equivalent migration) before indexing |
+
+Other expected behaviours (not errors): searching a space with **no embedder** returns lexical-only results, and a doc indexed without a vector still serves keyword search — both by design (availability over completeness).
+
 ## Installation
 
 ```bash

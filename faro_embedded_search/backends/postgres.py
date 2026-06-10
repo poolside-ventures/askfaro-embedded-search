@@ -22,6 +22,7 @@ import re
 from datetime import datetime
 from typing import Any, Sequence
 
+from ..errors import ConfigurationError, MissingDependencyError
 from ..types import Filters, IndexDoc, RawHit, utcnow_iso
 from .base import ChangeRow
 
@@ -63,7 +64,12 @@ class PostgresBackend:
         dim: int = 1536,
         spaces: dict[str, int] | None = None,
     ):
-        from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+        try:
+            from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+        except ImportError as e:
+            raise MissingDependencyError(
+                "PostgresBackend", "postgres", "sqlalchemy[asyncio] / asyncpg"
+            ) from e
 
         if isinstance(dsn_or_engine, AsyncEngine):
             self._engine = dsn_or_engine
@@ -131,7 +137,23 @@ class PostgresBackend:
             )
         async with self._engine.begin() as conn:
             for stmt in stmts:
-                await conn.execute(text(stmt))
+                try:
+                    await conn.execute(text(stmt))
+                except Exception as e:
+                    msg = str(e).lower()
+                    if "vector" in msg and (
+                        "extension" in msg or "type" in msg or "does not exist" in msg
+                    ):
+                        raise ConfigurationError(
+                            "The pgvector extension isn't available on this Postgres "
+                            "server, so the vector column/index can't be created.\n"
+                            "  - Managed Postgres (RDS / Cloud SQL / Supabase / Railway): "
+                            "enable the 'vector' extension for the database.\n"
+                            "  - Self-hosted: install pgvector "
+                            "(https://github.com/pgvector/pgvector), then retry.\n"
+                            "  - Or use SQLiteBackend, which needs no extension."
+                        ) from e
+                    raise
 
     # -- write path -------------------------------------------------------
 
@@ -160,6 +182,13 @@ class PostgresBackend:
         out = {}
         for s in self.spaces:
             vec = embeddings.get(s)
+            if vec is not None and len(vec) != self.space_dims[s]:
+                raise ConfigurationError(
+                    f"Embedding for space '{s}' has dimension {len(vec)}, but the index "
+                    f"is configured for {self.space_dims[s]}. Use an embedder that emits "
+                    f"{self.space_dims[s]}-dim vectors, or configure the backend with "
+                    f"spaces={{'{s}': {len(vec)}}} (and re-create the schema)."
+                )
             out[f"vec_{s}"] = _vector_literal(vec) if vec else None
         return out
 

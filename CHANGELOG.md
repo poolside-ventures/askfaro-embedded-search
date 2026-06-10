@@ -4,6 +4,22 @@ All notable changes to `faro-embedded-search` are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/), and the project aims
 to follow [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-06-10
+
+### Added
+- **Clear setup errors** (`FaroSearchError` and subclasses) for the common
+  adopter mistakes, replacing cryptic underlying failures:
+  - `MissingDependencyError` when `PostgresBackend` / `OpenAICompatibleEmbedder`
+    are used without their install extra — names the package and the exact
+    `pip install` command. (Also subclasses `ImportError` for compatibility.)
+  - `ConfigurationError` when the pgvector extension isn't available, when an
+    embedding's dimension doesn't match its space's column, when a `SearchIndex`
+    has an embedder for a space the backend doesn't define, or when SQLite lacks
+    FTS5 — each with the concrete fix.
+- A **Troubleshooting** table in the README mapping symptom → cause → fix.
+
+[0.4.0]: https://github.com/poolside-ventures/faro-embedded-search/releases/tag/v0.4.0
+
 ## [0.3.0] - 2026-06-10
 
 ### Added

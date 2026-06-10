@@ -13,6 +13,7 @@ from typing import Callable, Sequence
 
 from .backends.base import Backend, ChangeRow
 from .embedder import Embedder
+from .errors import ConfigurationError
 from .fusion import collapse_objects as _collapse
 from .fusion import diversify as _diversify
 from .fusion import rrf_fuse
@@ -54,6 +55,16 @@ class SearchIndex:
     ):
         if embedders is None:
             embedders = {default_space: embedder} if embedder is not None else {}
+        backend_spaces = set(getattr(backend, "spaces", []) or [])
+        unknown = set(embedders) - backend_spaces
+        if backend_spaces and unknown:
+            raise ConfigurationError(
+                f"SearchIndex was given embedders for space(s) {sorted(unknown)} that "
+                f"the backend doesn't define (backend spaces: {sorted(backend_spaces)}).\n"
+                f"  Configure the backend with matching spaces, e.g.\n"
+                f"    PostgresBackend(..., spaces={{'{next(iter(unknown))}': 1536}})\n"
+                f"    SQLiteBackend(..., spaces={tuple(sorted(unknown))!r})"
+            )
         self.backend = backend
         self.embedders = embedders
         self.default_space = default_space

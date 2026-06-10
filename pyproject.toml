@@ -1,6 +1,6 @@
 [project]
 name = "faro-embedded-search"
-version = "0.3.0"
+version = "0.4.0"
 description = "Incremental hybrid retrieval (lexical + vector, RRF-fused) with identical semantics on server Postgres and on-device SQLite"
 readme = "README.md"
 requires-python = ">=3.11"

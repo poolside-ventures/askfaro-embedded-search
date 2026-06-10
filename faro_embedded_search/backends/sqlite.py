@@ -27,6 +27,7 @@ from array import array
 from math import sqrt
 from typing import Any, Sequence
 
+from ..errors import ConfigurationError
 from ..types import Filters, IndexDoc, RawHit, utcnow_iso
 from .base import ChangeRow
 
@@ -117,7 +118,17 @@ class SQLiteBackend:
         self._conn.row_factory = sqlite3.Row
         if path != ":memory:":
             self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.executescript(_SCHEMA)
+        try:
+            self._conn.executescript(_SCHEMA)
+        except sqlite3.OperationalError as e:
+            if "fts5" in str(e).lower():
+                raise ConfigurationError(
+                    "This SQLite build lacks the FTS5 extension, which the lexical "
+                    "retriever needs. Most CPython builds include it; if yours doesn't, "
+                    "use a Python whose bundled SQLite has FTS5 (or rebuild SQLite with "
+                    "-DSQLITE_ENABLE_FTS5)."
+                ) from e
+            raise
         self._ensure_columns()
         self._conn.commit()
 

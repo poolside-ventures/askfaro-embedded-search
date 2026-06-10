@@ -56,7 +56,14 @@ class OpenAICompatibleEmbedder:
         self.timeout = timeout
 
     async def embed(self, texts: Sequence[str]) -> list[list[float] | None]:
-        import httpx
+        try:
+            import httpx
+        except ImportError as e:
+            from .errors import MissingDependencyError
+
+            raise MissingDependencyError(
+                "OpenAICompatibleEmbedder", "http", "httpx"
+            ) from e
 
         if not texts:
             return []
