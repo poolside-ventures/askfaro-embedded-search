@@ -10,7 +10,7 @@ from __future__ import annotations
 
 
 class FaroSearchError(Exception):
-    """Base class for all faro-embedded-search setup/configuration errors."""
+    """Base class for all askfaro-embedded-search setup/configuration errors."""
 
 
 class MissingDependencyError(FaroSearchError, ImportError):
@@ -19,7 +19,7 @@ class MissingDependencyError(FaroSearchError, ImportError):
     def __init__(self, what: str, extra: str, package: str):
         super().__init__(
             f"{what} requires the '{extra}' extra, which isn't installed.\n"
-            f"  Install it with:  pip install \"faro-embedded-search[{extra}]\"\n"
+            f"  Install it with:  pip install \"askfaro-embedded-search[{extra}]\"\n"
             f"  (missing package: {package})"
         )
 

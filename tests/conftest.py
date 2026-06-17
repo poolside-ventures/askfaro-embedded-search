@@ -9,7 +9,7 @@ import re
 
 import pytest
 
-from faro_embedded_search import CallableEmbedder
+from askfaro_embedded_search import CallableEmbedder
 
 # Wide enough that md5-bucket collisions between unrelated tokens are
 # vanishingly rare; collisions at small dims caused spurious semantic hits.

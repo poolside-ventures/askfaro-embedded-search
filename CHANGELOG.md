@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `faro-embedded-search` are documented here. The format
+All notable changes to `askfaro-embedded-search` are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/), and the project aims
 to follow [Semantic Versioning](https://semver.org/).
 
@@ -8,7 +8,7 @@ to follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 - Embedding failures (at both index time and query time) are now logged at
-  `WARNING` on the `faro_embedded_search` logger with the exception, instead of
+  `WARNING` on the `askfaro_embedded_search` logger with the exception, instead of
   being swallowed silently. Behavior is otherwise unchanged (still non-fatal,
   availability over completeness), but a misconfigured embedder (bad key, wrong
   endpoint) now surfaces instead of quietly degrading search to lexical-only.
@@ -17,6 +17,18 @@ to follow [Semantic Versioning](https://semver.org/).
 - Document partition semantics (optional, defaults to `None`, exact-match filter,
   and the two quiet-failure modes that follow) and the new embedding-failure
   logging in the README.
+
+## [0.5.0] - 2026-06-17
+
+### Changed
+- **Package renamed** from `faro-embedded-search` to `askfaro-embedded-search`,
+  and the import name from `faro_embedded_search` to `askfaro_embedded_search`,
+  to match the AskFaro brand. Update imports and run
+  `pip install askfaro-embedded-search`. The old name ships one final `0.4.1`
+  release that re-exports this package and warns on import. No functional change.
+  Public class names (`FaroSearchError`, etc.) are unchanged, and the default
+  Postgres table name (`faro_embedded_search_index`) is preserved for backward
+  compatibility.
 
 ## [0.4.0] - 2026-06-10
 
@@ -32,7 +44,7 @@ to follow [Semantic Versioning](https://semver.org/).
     FTS5 — each with the concrete fix.
 - A **Troubleshooting** table in the README mapping symptom → cause → fix.
 
-[0.4.0]: https://github.com/poolside-ventures/faro-embedded-search/releases/tag/v0.4.0
+[0.4.0]: https://github.com/poolside-ventures/askfaro-embedded-search/releases/tag/v0.4.0
 
 ## [0.3.0] - 2026-06-10
 
@@ -59,7 +71,7 @@ to follow [Semantic Versioning](https://semver.org/).
   As this is pre-1.0 with no migration path yet, re-create/backfill a 0.2.0
   index rather than upgrading it in place.
 
-[0.3.0]: https://github.com/poolside-ventures/faro-embedded-search/releases/tag/v0.3.0
+[0.3.0]: https://github.com/poolside-ventures/askfaro-embedded-search/releases/tag/v0.3.0
 
 ## [0.2.0] - 2026-06-10
 
@@ -81,7 +93,7 @@ to follow [Semantic Versioning](https://semver.org/).
 - Idempotent in-place schema upgrades: `create_schema()` (Postgres) and
   `SQLiteBackend(...)` add the new `attrs` column to indexes created by 0.1.0.
 
-[0.2.0]: https://github.com/poolside-ventures/faro-embedded-search/releases/tag/v0.2.0
+[0.2.0]: https://github.com/poolside-ventures/askfaro-embedded-search/releases/tag/v0.2.0
 
 ## [0.1.0] - 2026-06-10
 
@@ -107,4 +119,4 @@ Initial release.
 - Cursor-based shard replication (`replicate`, `export_shard`) with
   tombstone deletes, for the index-server-side / retrieve-on-device pattern.
 
-[0.1.0]: https://github.com/poolside-ventures/faro-embedded-search/releases/tag/v0.1.0
+[0.1.0]: https://github.com/poolside-ventures/askfaro-embedded-search/releases/tag/v0.1.0

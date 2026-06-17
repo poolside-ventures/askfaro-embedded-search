@@ -1,4 +1,4 @@
-"""faro-embedded-search: incremental hybrid retrieval, server-side and on-device."""
+"""askfaro-embedded-search: incremental hybrid retrieval, server-side and on-device."""
 
 from .embedder import CallableEmbedder, Embedder, OpenAICompatibleEmbedder
 from .errors import ConfigurationError, FaroSearchError, MissingDependencyError

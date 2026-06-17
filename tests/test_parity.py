@@ -17,8 +17,8 @@ import os
 
 import pytest
 
-from faro_embedded_search import IndexDoc, SearchIndex
-from faro_embedded_search.backends.sqlite import SQLiteBackend
+from askfaro_embedded_search import IndexDoc, SearchIndex
+from askfaro_embedded_search.backends.sqlite import SQLiteBackend
 
 DSN = os.environ.get("FARO_EMBEDDED_SEARCH_TEST_DSN")
 pytestmark = pytest.mark.skipif(not DSN, reason="FARO_EMBEDDED_SEARCH_TEST_DSN not set")
@@ -72,7 +72,7 @@ async def _run_all(index: SearchIndex):
 async def test_postgres_sqlite_rank_identically(embedder, tmp_path):
     from sqlalchemy import text
 
-    from faro_embedded_search.backends.postgres import PostgresBackend
+    from askfaro_embedded_search.backends.postgres import PostgresBackend
 
     pg = PostgresBackend(DSN, table="fs_parity", dim=DIM)
     async with pg._engine.begin() as conn:

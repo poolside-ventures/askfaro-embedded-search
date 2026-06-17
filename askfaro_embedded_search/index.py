@@ -26,7 +26,7 @@ DEFAULT_MIN_SEMANTIC_SCORE = 0.20
 
 DEFAULT_SPACE = "default"
 
-logger = logging.getLogger("faro_embedded_search")
+logger = logging.getLogger("askfaro_embedded_search")
 
 
 class SearchIndex:

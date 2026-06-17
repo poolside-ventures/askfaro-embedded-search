@@ -1,8 +1,8 @@
-# faro-embedded-search
+# askfaro-embedded-search
 
 **Incremental hybrid retrieval with identical semantics on the server and on-device.**
 
-`faro-embedded-search` is a small, dependency-light library for searching a *continuously growing* collection of heterogeneous objects — notes, contacts, emails, tasks, tools, anything — without ever rebuilding an index. It is built for the pattern modern assistant apps need:
+`askfaro-embedded-search` is a small, dependency-light library for searching a *continuously growing* collection of heterogeneous objects — notes, contacts, emails, tasks, tools, anything — without ever rebuilding an index. It is built for the pattern modern assistant apps need:
 
 > **Index server-side, retrieve on-device.** Embeddings are computed once, centrally. Each user's slice of the index is replicated into a local SQLite shard, and the device answers queries locally — fast, offline, and private — with *exactly* the same ranking the server would produce.
 
@@ -10,7 +10,7 @@ Built and dogfooded by Faro; also the embedded retrieval engine of Scope.
 
 ## Why another retrieval library?
 
-Most RAG tooling assumes a batch world: ingest a corpus, build a tree/graph/index, query it. Real applications have **object-level CRUD** — a contact edited, a task created, an email deleted — and small/on-device context windows that punish irrelevant results. `faro-embedded-search` makes two opinionated choices:
+Most RAG tooling assumes a batch world: ingest a corpus, build a tree/graph/index, query it. Real applications have **object-level CRUD** — a contact edited, a task created, an email deleted — and small/on-device context windows that punish irrelevant results. `askfaro-embedded-search` makes two opinionated choices:
 
 1. **Incremental-first.** One upsert per object write. Postgres (pgvector HNSW + tsvector GIN) and SQLite (FTS5 + vector blobs) both take per-row inserts natively, so there is no "rebuild" anywhere in the design. Hierarchical enrichment (summary and cluster nodes) lives in the *same flat pool* as extra rows — never on the write path.
 2. **Rank-based fusion.** Lexical and semantic retrievers run in parallel and are fused with Reciprocal Rank Fusion (RRF, K=60). Because RRF consumes *ranks*, not raw scores, the incomparable scoring scales of `ts_rank_cd` (Postgres) and `bm25()` (SQLite FTS5) don't matter: the same corpus and query rank identically on both backends. That is what makes "same engine, server and device" honest rather than aspirational.
@@ -18,8 +18,8 @@ Most RAG tooling assumes a batch world: ingest a corpus, build a tree/graph/inde
 ## Quick start
 
 ```python
-from faro_embedded_search import IndexDoc, SearchIndex, OpenAICompatibleEmbedder
-from faro_embedded_search.backends.sqlite import SQLiteBackend
+from askfaro_embedded_search import IndexDoc, SearchIndex, OpenAICompatibleEmbedder
+from askfaro_embedded_search.backends.sqlite import SQLiteBackend
 
 index = SearchIndex(
     SQLiteBackend("search.db"),
@@ -70,7 +70,7 @@ await index.search("refund a customer", object_types=["tool"], attrs={"category"
 ### Server-side: Postgres
 
 ```python
-from faro_embedded_search.backends.postgres import PostgresBackend  # pip install faro-embedded-search[postgres]
+from askfaro_embedded_search.backends.postgres import PostgresBackend  # pip install askfaro-embedded-search[postgres]
 
 backend = PostgresBackend("postgresql+asyncpg://...", table="faro_embedded_search_index", dim=1536)
 await backend.create_schema()     # idempotent; or transcribe the DDL into your migrations
@@ -80,7 +80,7 @@ index = SearchIndex(backend, embedder)
 ### On-device: replicate a shard, query locally
 
 ```python
-from faro_embedded_search import export_shard, replicate
+from askfaro_embedded_search import export_shard, replicate
 
 # Full export of one user's partition into a SQLite file:
 shard = await export_shard(server_backend, "user-42.db", partition="user-42")
@@ -93,7 +93,7 @@ The shard is a plain SQLite file whose schema **is** the interchange format — 
 
 ## Tiering without batch trees
 
-RAPTOR-style hierarchies buy small-context windows a lot — but a recursive tree can't be rebuilt on every insert. `faro-embedded-search` keeps the index flat and gets the benefit through **node kinds**:
+RAPTOR-style hierarchies buy small-context windows a lot — but a recursive tree can't be rebuilt on every insert. `askfaro-embedded-search` keeps the index flat and gets the benefit through **node kinds**:
 
 - `leaf` — the object itself (default).
 - `summary` — an optional one-line abstract of an object, indexed alongside it. O(1) per object, generated on your write path or a background pass.
@@ -146,7 +146,7 @@ Because a server-only object (the email above) has no local vector, on-device it
 Per-type behavior lives in code, not schema, via a tiny registry:
 
 ```python
-from faro_embedded_search import register, docs_for
+from askfaro_embedded_search import register, docs_for
 
 @register("contact")
 def index_contact(c) -> IndexDoc:
@@ -161,7 +161,7 @@ await index.upsert_many(docs_for("contact", some_contact))
 
 ## Design notes
 
-- **Embedding failure is non-fatal, but never silent.** A row written without a vector still serves lexical queries and gains semantic retrieval after a backfill — availability over completeness. Every embedding failure (at index time *and* query time) is logged at `WARNING` on the `faro_embedded_search` logger with the exception, so a misconfigured embedder (bad key, wrong endpoint) surfaces instead of silently degrading search to keyword-only. Wire that logger up in your app to catch it.
+- **Embedding failure is non-fatal, but never silent.** A row written without a vector still serves lexical queries and gains semantic retrieval after a backfill — availability over completeness. Every embedding failure (at index time *and* query time) is logged at `WARNING` on the `askfaro_embedded_search` logger with the exception, so a misconfigured embedder (bad key, wrong endpoint) surfaces instead of silently degrading search to keyword-only. Wire that logger up in your app to catch it.
 - **Exact semantic scan on SQLite.** Per-user shards are small (tens of thousands of rows); an exact cosine scan (numpy-accelerated when present) costs no index maintenance and returns exact results. ANN acceleration (e.g. sqlite-vec) can be added without changing the file format.
 - **Diversity, not padding.** An optional per-group cap (`diversity_key`) drops near-duplicate siblings instead of deferring them.
 - **Stemming parity.** Postgres uses the `english` text-search config; SQLite FTS5 uses the `porter` tokenizer. Both stem morphological variants ("groceries" → "grocery") so the server and a device shard rank the same corpus identically.
@@ -178,8 +178,8 @@ The library raises clear, actionable errors for the common setup mistakes (all s
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `MissingDependencyError: PostgresBackend requires the 'postgres' extra` | Installed the core only | `pip install "faro-embedded-search[postgres]"` |
-| `MissingDependencyError: OpenAICompatibleEmbedder requires the 'http' extra` | Missing httpx | `pip install "faro-embedded-search[http]"` |
+| `MissingDependencyError: PostgresBackend requires the 'postgres' extra` | Installed the core only | `pip install "askfaro-embedded-search[postgres]"` |
+| `MissingDependencyError: OpenAICompatibleEmbedder requires the 'http' extra` | Missing httpx | `pip install "askfaro-embedded-search[http]"` |
 | `ConfigurationError: pgvector extension isn't available…` | Postgres server has no `vector` extension | Enable/install [pgvector](https://github.com/pgvector/pgvector), or use `SQLiteBackend` (no extension needed) |
 | `ConfigurationError: Embedding for space 'x' has dimension N, but the index is configured for M` | Embedder output dim ≠ the space's column dim | Match the dims: configure the backend with `spaces={'x': N}` (then re-create the schema), or use an embedder that emits M-dim vectors |
 | `ConfigurationError: …embedders for space(s) [...] that the backend doesn't define` | `SearchIndex` has an embedder for a space the backend wasn't configured with | Give the backend matching spaces: `PostgresBackend(..., spaces={...})` / `SQLiteBackend(..., spaces=(...))` |
@@ -191,10 +191,10 @@ Other expected behaviours (not errors): searching a space with **no embedder** r
 ## Installation
 
 ```bash
-pip install faro-embedded-search                # core (SQLite backend, stdlib only)
-pip install faro-embedded-search[postgres]      # + Postgres/pgvector backend
-pip install faro-embedded-search[http]          # + OpenAI-compatible embedder
-pip install faro-embedded-search[numpy]         # + fast cosine on SQLite
+pip install askfaro-embedded-search                # core (SQLite backend, stdlib only)
+pip install askfaro-embedded-search[postgres]      # + Postgres/pgvector backend
+pip install askfaro-embedded-search[http]          # + OpenAI-compatible embedder
+pip install askfaro-embedded-search[numpy]         # + fast cosine on SQLite
 ```
 
 ## License

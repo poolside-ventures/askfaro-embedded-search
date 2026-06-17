@@ -1,13 +1,13 @@
 import pytest
 
-from faro_embedded_search import (
+from askfaro_embedded_search import (
     CallableEmbedder,
     IndexDoc,
     SearchIndex,
     export_shard,
     replicate,
 )
-from faro_embedded_search.backends.sqlite import SQLiteBackend
+from askfaro_embedded_search.backends.sqlite import SQLiteBackend
 from tests.conftest import bow_vector
 
 

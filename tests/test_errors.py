@@ -2,14 +2,14 @@
 
 import pytest
 
-from faro_embedded_search import (
+from askfaro_embedded_search import (
     CallableEmbedder,
     ConfigurationError,
     IndexDoc,
     MissingDependencyError,
     SearchIndex,
 )
-from faro_embedded_search.backends.sqlite import SQLiteBackend
+from askfaro_embedded_search.backends.sqlite import SQLiteBackend
 
 
 def _embedder(dim=8):
@@ -31,7 +31,7 @@ async def test_missing_dependency_error_message():
     # The message must name the package and the exact install command.
     err = MissingDependencyError("PostgresBackend", "postgres", "sqlalchemy / asyncpg")
     msg = str(err)
-    assert 'pip install "faro-embedded-search[postgres]"' in msg
+    assert 'pip install "askfaro-embedded-search[postgres]"' in msg
     assert "sqlalchemy" in msg
     # It's both a FaroSearchError and an ImportError so existing `except
     # ImportError` handlers still catch it.

@@ -5,7 +5,7 @@ name: publish
 #
 # One-time PyPI setup (project → Publishing → Add a trusted publisher):
 #   Owner:           poolside-ventures
-#   Repository:      faro-embedded-search
+#   Repository:      askfaro-embedded-search
 #   Workflow name:   publish.yml
 #   Environment:     (leave blank)
 
