@@ -60,6 +60,13 @@ await index.search("refund a customer", object_types=["tool"], attrs={"category"
 
 `attrs` is matched by containment (all given keys must equal), backed by a JSONB GIN index on Postgres and `json_extract` on SQLite — so it filters identically on server and device.
 
+#### Partitions
+
+`partition` is the per-tenant isolation key (and the unit of on-device shard replication). It is **optional and defaults to `None`**, and a query's `partition` filter is an **exact match**: `search(..., partition="user-42")` returns only rows upserted with `partition="user-42"`. Two consequences worth knowing up front, because both fail quietly rather than with an error:
+
+- A row indexed **without** a partition (`None`) will **not** appear in a query that filters by a partition, and vice-versa. Pick one convention per corpus — either always set a partition, or never — and don't mix.
+- `search()` with no `partition` does **not** scope to a tenant; it searches across every partition. Pass the partition on every query in a multi-tenant index.
+
 ### Server-side: Postgres
 
 ```python
@@ -154,7 +161,7 @@ await index.upsert_many(docs_for("contact", some_contact))
 
 ## Design notes
 
-- **Embedding failure is non-fatal.** A row written without a vector still serves lexical queries and gains semantic retrieval after a backfill — availability over completeness.
+- **Embedding failure is non-fatal, but never silent.** A row written without a vector still serves lexical queries and gains semantic retrieval after a backfill — availability over completeness. Every embedding failure (at index time *and* query time) is logged at `WARNING` on the `faro_embedded_search` logger with the exception, so a misconfigured embedder (bad key, wrong endpoint) surfaces instead of silently degrading search to keyword-only. Wire that logger up in your app to catch it.
 - **Exact semantic scan on SQLite.** Per-user shards are small (tens of thousands of rows); an exact cosine scan (numpy-accelerated when present) costs no index maintenance and returns exact results. ANN acceleration (e.g. sqlite-vec) can be added without changing the file format.
 - **Diversity, not padding.** An optional per-group cap (`diversity_key`) drops near-duplicate siblings instead of deferring them.
 - **Stemming parity.** Postgres uses the `english` text-search config; SQLite FTS5 uses the `porter` tokenizer. Both stem morphological variants ("groceries" → "grocery") so the server and a device shard rank the same corpus identically.

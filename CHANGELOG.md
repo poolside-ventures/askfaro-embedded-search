@@ -4,6 +4,20 @@ All notable changes to `faro-embedded-search` are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/), and the project aims
 to follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- Embedding failures (at both index time and query time) are now logged at
+  `WARNING` on the `faro_embedded_search` logger with the exception, instead of
+  being swallowed silently. Behavior is otherwise unchanged (still non-fatal,
+  availability over completeness), but a misconfigured embedder (bad key, wrong
+  endpoint) now surfaces instead of quietly degrading search to lexical-only.
+
+### Docs
+- Document partition semantics (optional, defaults to `None`, exact-match filter,
+  and the two quiet-failure modes that follow) and the new embedding-failure
+  logging in the README.
+
 ## [0.4.0] - 2026-06-10
 
 ### Added

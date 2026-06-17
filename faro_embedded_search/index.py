@@ -8,6 +8,7 @@ results for the same corpus and query.
 
 from __future__ import annotations
 
+import logging
 from collections import OrderedDict
 from typing import Callable, Sequence
 
@@ -24,6 +25,8 @@ from .types import Filters, IndexDoc, SearchResult, utcnow_iso
 DEFAULT_MIN_SEMANTIC_SCORE = 0.20
 
 DEFAULT_SPACE = "default"
+
+logger = logging.getLogger("faro_embedded_search")
 
 
 class SearchIndex:
@@ -101,6 +104,17 @@ class SearchIndex:
                 try:
                     embedded = await embedder.embed([texts[i] for i in idxs])
                 except Exception:
+                    # Non-fatal by design (availability over completeness), but
+                    # never silent: a misconfigured embedder/key/endpoint shows up
+                    # here as rows written lexical-only. Log loudly so it's visible.
+                    logger.warning(
+                        "embedding failed for space %r; writing %d row(s) without a "
+                        "vector (lexical-only until re-embedded). Check the embedder "
+                        "credentials/endpoint.",
+                        space,
+                        len(idxs),
+                        exc_info=True,
+                    )
                     embedded = [None] * len(idxs)
                 for j, i in enumerate(idxs):
                     vectors[i] = embedded[j] if j < len(embedded) else None
@@ -178,6 +192,14 @@ class SearchIndex:
         try:
             vectors = await embedder.embed([query])
         except Exception:
+            # Non-fatal: fall back to lexical-only results. Logged (not silent) so a
+            # broken query-time embedder doesn't quietly degrade search to keyword.
+            logger.warning(
+                "query embedding failed for space %r; returning lexical-only "
+                "results. Check the embedder credentials/endpoint.",
+                space,
+                exc_info=True,
+            )
             return None
         vec = vectors[0] if vectors else None
         if vec is not None:
