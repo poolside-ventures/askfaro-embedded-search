@@ -209,3 +209,40 @@ async def test_shard_export_and_delta_sync(index, embedder, tmp_path):
     assert await replicate(index.backend, shard.backend,
                            partition="acct-1", cursor=cursor) == cursor
     await shard.close()
+
+
+async def test_keyword_channel_matches_terms_absent_from_body(index):
+    # "dunning" appears ONLY in keywords, never in title/body — so it can't be
+    # embedded (index_text excludes keywords) but must be findable by keyword.
+    await index.upsert(doc("ar", "Invoicing", "How to send a bill and chase payment.",
+                           keywords=["dunning", "accounts receivable", "overdue"]))
+    await index.upsert(doc("misc", "Grocery list", "milk eggs bread"))
+
+    results = await index.search("dunning")
+    assert [r.object_id for r in results] == ["ar"]
+    # lexical-only hit: the semantic vector (body-derived) doesn't carry "dunning"
+    assert results[0].match_type == "keyword"
+
+
+async def test_keywords_do_not_leak_into_semantic_space(index):
+    # A pure-semantic query for the keyword must NOT surface the doc via the vector.
+    await index.upsert(doc("ar", "Invoicing", "How to send a bill.",
+                           keywords=["dunning"]))
+    # semantic-only retrieval (bypass lexical) — the keyword isn't embedded
+    from askfaro_embedded_search.types import Filters
+    vec = await index._embed_query("default", "dunning")
+    semantic = await index.backend.semantic_search(vec, "default", Filters(), 10, 0.2)
+    assert all(h.object_id != "ar" for h in semantic)
+
+
+async def test_search_modes_run_and_respect_floor(index):
+    await seed(index)
+    for mode in ("balanced", "precision", "explore"):
+        results = await index.search("grocery milk", mode=mode)
+        assert results and results[0].object_id == "n2"
+
+
+async def test_invalid_mode_raises(index):
+    from askfaro_embedded_search.errors import ConfigurationError
+    with pytest.raises(ConfigurationError):
+        await index.search("anything", mode="bogus")

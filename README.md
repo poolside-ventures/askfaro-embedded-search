@@ -60,6 +60,40 @@ await index.search("refund a customer", object_types=["tool"], attrs={"category"
 
 `attrs` is matched by containment (all given keys must equal), backed by a JSONB GIN index on Postgres and `json_extract` on SQLite — so it filters identically on server and device.
 
+### Keyword channel
+
+The prose that makes `body` good for an agent to *read* (and to embed well) is
+often not the text that makes it *findable* by keyword — distinctive terms,
+synonyms, and codes get diluted in a sentence. `keywords` is a separate lexical
+channel: it feeds the BM25/FTS index but is **kept out of the embedding**, so it
+sharpens keyword recall without polluting the semantic vector. It is never
+returned to callers (display uses `payload`).
+
+```python
+await index.upsert(IndexDoc(
+    object_type="doc", object_id="ar-guide",
+    title="Invoicing", body="How to send a bill and chase payment.",
+    keywords=["dunning", "accounts receivable", "AR", "overdue"],   # lexical only
+))
+await index.search("dunning")   # matches via the keyword channel; the body never says "dunning"
+```
+
+### Search modes
+
+`search(..., mode=...)` trades precision for exploration by reweighting the
+lexical/semantic fusion (and the semantic floor):
+
+| mode | leans | use when |
+|---|---|---|
+| `balanced` (default) | even hybrid | general search |
+| `precision` | lexical / exact, tighter semantic floor | you want few false positives |
+| `explore` | semantic / associative, looser floor | you want a wider, discovery-oriented net |
+
+```python
+await index.search("oauth redirect", mode="precision")   # exact-match leaning
+await index.search("things like oauth", mode="explore")  # associative recall
+```
+
 #### Partitions
 
 `partition` is the per-tenant isolation key (and the unit of on-device shard replication). It is **optional and defaults to `None`**, and a query's `partition` filter is an **exact match**: `search(..., partition="user-42")` returns only rows upserted with `partition="user-42"`. Two consequences worth knowing up front, because both fail quietly rather than with an error:

@@ -6,6 +6,19 @@ to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-07
+
+### Added
+- **Keyword channel** — `IndexDoc.keywords`: distinctive terms indexed for BM25
+  recall but kept **out of the embedding** (`index_text()` excludes them,
+  `lexical_body()` includes them), so keyword terms sharpen lexical findability
+  without diluting the semantic vector. Never returned to callers (display uses
+  `payload`); backends store it as the FTS body.
+- **Search modes** — `SearchIndex.search(mode=...)`: `precision` (lexical/exact
+  leaning, tighter semantic floor), `explore` (semantic/associative, looser
+  floor), and `balanced` (default). Implemented as weighted RRF fusion
+  (`rrf_fuse(lexical_weight=, semantic_weight=)`).
+
 ### Changed
 - Embedding failures (at both index time and query time) are now logged at
   `WARNING` on the `askfaro_embedded_search` logger with the exception, instead of
@@ -17,6 +30,7 @@ to follow [Semantic Versioning](https://semver.org/).
 - Document partition semantics (optional, defaults to `None`, exact-match filter,
   and the two quiet-failure modes that follow) and the new embedding-failure
   logging in the README.
+- Document the keyword channel and the `precision`/`explore`/`balanced` search modes.
 
 ## [0.5.0] - 2026-06-17
 
