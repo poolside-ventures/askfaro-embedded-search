@@ -206,7 +206,7 @@ class PostgresBackend:
             "object_id": doc.object_id,
             "node_kind": doc.node_kind,
             "title": doc.title,
-            "body": doc.body,
+            "body": doc.lexical_body(),  # body + keyword channel (FTS source, never returned)
             "payload": json.dumps(doc.payload) if doc.payload is not None else None,
             "attrs": json.dumps(doc.attrs) if doc.attrs is not None else None,
             "source_updated_at": _ts(doc.source_updated_at),

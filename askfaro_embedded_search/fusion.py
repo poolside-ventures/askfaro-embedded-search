@@ -20,8 +20,15 @@ def rrf_fuse(
     semantic: Sequence[RawHit],
     *,
     rrf_k: int = RRF_K,
+    lexical_weight: float = 1.0,
+    semantic_weight: float = 1.0,
 ) -> list[SearchResult]:
-    """Fuse two ranked candidate lists into one, ordered by RRF score."""
+    """Fuse two ranked candidate lists into one, ordered by RRF score.
+
+    `lexical_weight`/`semantic_weight` bias the fusion between channels — the
+    knob behind precision vs. explore mode (precision leans lexical/exact,
+    explore leans semantic/associative). Default 1.0/1.0 is balanced hybrid.
+    """
     lexical_ranks = {hit.key: i + 1 for i, hit in enumerate(lexical)}
     semantic_ranks = {hit.key: i + 1 for i, hit in enumerate(semantic)}
     semantic_scores = {hit.key: hit.sim for hit in semantic if hit.sim is not None}
@@ -38,9 +45,9 @@ def rrf_fuse(
         sem_rank = semantic_ranks.get(key)
         score = 0.0
         if lex_rank is not None:
-            score += 1.0 / (rrf_k + lex_rank)
+            score += lexical_weight / (rrf_k + lex_rank)
         if sem_rank is not None:
-            score += 1.0 / (rrf_k + sem_rank)
+            score += semantic_weight / (rrf_k + sem_rank)
         if lex_rank is not None and sem_rank is not None:
             match_type = "hybrid"
         elif lex_rank is not None:

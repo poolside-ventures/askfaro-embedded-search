@@ -31,6 +31,11 @@ class IndexDoc:
     object_id: str
     title: str | None = None
     body: str | None = None
+    # Keyword-channel terms: distinctive words that aid lexical (BM25) recall but
+    # would dilute the semantic embedding if mixed into the prose. They augment
+    # the lexical index only — `index_text()` (embedded) excludes them,
+    # `lexical_text()` (FTS) includes them. See the retrieval/agent-reading split.
+    keywords: list[str] | None = None
     node_kind: str = NODE_KIND_LEAF
     partition: str | None = None
     payload: dict[str, Any] | None = None
@@ -49,8 +54,21 @@ class IndexDoc:
         return (self.object_type, self.object_id, self.node_kind)
 
     def index_text(self) -> str:
+        """Text embedded into the semantic space — the human/agent-reading field.
+        Keywords are deliberately excluded (they dilute embedding quality)."""
         parts = [p for p in (self.title, self.body) if p]
         return "\n".join(parts)
+
+    def lexical_body(self) -> str | None:
+        """The value backends store in the FTS `body` column: the body plus the
+        distinctive `keywords`. This is the keyword channel — indexed for BM25 but
+        kept out of `index_text()` (the embedded field) so keyword terms don't
+        dilute the semantic vector. Never returned to callers (display uses
+        `payload`); title stays in its own FTS column."""
+        parts = [p for p in (self.body,) if p]
+        if self.keywords:
+            parts.append(" ".join(self.keywords))
+        return "\n".join(parts) if parts else None
 
 
 @dataclass

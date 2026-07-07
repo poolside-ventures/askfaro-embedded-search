@@ -230,7 +230,7 @@ class SQLiteBackend:
                 "object_id": doc.object_id,
                 "node_kind": doc.node_kind,
                 "title": doc.title,
-                "body": doc.body,
+                "body": doc.lexical_body(),  # body + keyword channel (FTS source, never returned)
                 "payload": doc.payload,
                 "attrs": doc.attrs,
                 "embeddings": embeddings,

@@ -26,6 +26,17 @@ DEFAULT_MIN_SEMANTIC_SCORE = 0.20
 
 DEFAULT_SPACE = "default"
 
+# Retrieval modes trade precision for exploration. `precision` leans on exact
+# lexical matches and raises the semantic floor (tight, few false positives);
+# `explore` leans on semantic recall and lowers the floor (associative, wider
+# net); `balanced` is even hybrid. Each is (lexical_weight, semantic_weight,
+# min_semantic_score_override|None).
+SEARCH_MODES = {
+    "balanced": (1.0, 1.0, None),
+    "precision": (2.0, 1.0, 0.35),
+    "explore": (1.0, 2.0, 0.10),
+}
+
 logger = logging.getLogger("askfaro_embedded_search")
 
 
@@ -147,6 +158,7 @@ class SearchIndex:
         node_kinds: list[str] | None = None,
         attrs: dict | None = None,
         min_semantic_score: float = DEFAULT_MIN_SEMANTIC_SCORE,
+        mode: str = "balanced",
         collapse: bool = True,
         diversity_key: Callable[[SearchResult], str] | None = None,
         diversity_cap: int = 2,
@@ -154,6 +166,13 @@ class SearchIndex:
         query = query.strip()
         if not query:
             return []
+        if mode not in SEARCH_MODES:
+            raise ConfigurationError(
+                f"mode must be one of {sorted(SEARCH_MODES)}, got {mode!r}"
+            )
+        lexical_weight, semantic_weight, mode_floor = SEARCH_MODES[mode]
+        if mode_floor is not None:
+            min_semantic_score = mode_floor
         space = space or self.default_space
         filters = Filters(
             partition=partition,
@@ -173,7 +192,9 @@ class SearchIndex:
                 query_vec, space, filters, candidates, min_semantic_score
             )
 
-        results = rrf_fuse(lexical, semantic)
+        results = rrf_fuse(
+            lexical, semantic, lexical_weight=lexical_weight, semantic_weight=semantic_weight
+        )
         if collapse:
             results = _collapse(results)
         if diversity_key is not None:
