@@ -6,6 +6,18 @@ to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-08-17
+
+### Fixed
+- **`PostgresBackend` connection pooling** — an engine the backend builds itself
+  (i.e. when constructed from a DSN rather than an `AsyncEngine`) now sets
+  `pool_pre_ping=True` and `pool_recycle=1800`. An index lives as long as the
+  process, so its pooled connections outlive any server-side idle timeout or
+  proxy recycle; with SQLAlchemy's defaults the first query after such a drop
+  raised `InterfaceError: connection is closed` instead of reconnecting. The
+  recycle window is settable via the new `pool_recycle=` argument. Callers that
+  pass their own engine are unaffected.
+
 ## [0.6.0] - 2026-07-07
 
 ### Added
