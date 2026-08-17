@@ -63,6 +63,7 @@ class PostgresBackend:
         table: str = "faro_embedded_search_index",
         dim: int = 1536,
         spaces: dict[str, int] | None = None,
+        pool_recycle: int = 1800,
     ):
         try:
             from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
@@ -75,7 +76,16 @@ class PostgresBackend:
             self._engine = dsn_or_engine
             self._owns_engine = False
         else:
-            self._engine = create_async_engine(dsn_or_engine)
+            # An index lives for the whole process, so its pooled connections
+            # outlive any server-side idle timeout or proxy recycle. Without a
+            # pre-ping the first query after such a drop raises "connection is
+            # closed" instead of transparently reconnecting. Callers who want
+            # different pool tuning pass their own engine.
+            self._engine = create_async_engine(
+                dsn_or_engine,
+                pool_pre_ping=True,
+                pool_recycle=pool_recycle,
+            )
             self._owns_engine = True
         self.table = table
         self.seq = f"{table}_updated_seq"
